@@ -271,6 +271,46 @@ static auth_result url_remove_listener (auth_client *auth_user)
 }
 
 
+static void url_add_pass_headers(auth_client *auth_user, char *post, ssize_t post_offset)
+{
+    client_t *client = auth_user->client;
+    auth_t *auth = client->auth;
+    auth_url *url = auth->state;
+    char *pass_headers, *cur_header, *next_header;
+    const char *header_val;
+    char *header_valesc;
+
+    pass_headers = NULL;
+    if (url->pass_headers)
+        pass_headers = strdup (url->pass_headers);
+    if (pass_headers)
+    {
+        cur_header = pass_headers;
+        while (cur_header)
+        {
+	    next_header = strstr (cur_header, ",");
+	    if (next_header)
+	    {
+		*next_header=0;
+                next_header++;
+	    }
+
+            header_val = httpp_getvar (client->parser, cur_header);
+            if (header_val)
+            {
+                header_valesc = util_url_escape (header_val);
+                post_offset += snprintf (post+post_offset, sizeof (post)-post_offset, "&%s%s=%s",
+                                         url->prefix_headers ? url->prefix_headers : "",
+                                         cur_header, header_valesc);
+                free (header_valesc);
+            }
+
+	    cur_header = next_header;
+        }
+    }
+}
+
+
 static auth_result url_add_listener (auth_client *auth_user)
 {
     client_t *client = auth_user->client;
@@ -284,9 +324,6 @@ static auth_result url_add_listener (auth_client *auth_user)
     ice_config_t *config;
     char *userpwd = NULL, post [4096];
     ssize_t post_offset;
-    char *pass_headers, *cur_header, *next_header;
-    const char *header_val;
-    char *header_valesc;
 
     if (url->addurl == NULL)
         return AUTH_OK;
@@ -331,34 +368,7 @@ static auth_result url_add_listener (auth_client *auth_user)
     free (password);
     free (ipaddr);
 
-    pass_headers = NULL;
-    if (url->pass_headers)
-        pass_headers = strdup (url->pass_headers);
-    if (pass_headers)
-    {
-        cur_header = pass_headers;
-        while (cur_header)
-        {
-	    next_header = strstr (cur_header, ",");
-	    if (next_header)
-	    {
-		*next_header=0;
-                next_header++;
-	    }
-
-            header_val = httpp_getvar (client->parser, cur_header);
-            if (header_val)
-            {
-                header_valesc = util_url_escape (header_val);
-                post_offset += snprintf (post+post_offset, sizeof (post)-post_offset, "&%s%s=%s",
-                                         url->prefix_headers ? url->prefix_headers : "",
-                                         cur_header, header_valesc);
-                free (header_valesc);
-            }
-
-	    cur_header = next_header;
-        }
-    }
+    url_add_pass_headers(auth_user, post, post_offset);
 
     if (strchr (url->addurl, '@') == NULL)
     {
