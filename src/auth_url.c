@@ -529,6 +529,8 @@ static void url_stream_auth (auth_client *auth_user)
     auth_url *url = client->auth->state;
     char *mount, *host, *user, *pass, *ipaddr, *admin="";
     char post [4096];
+    ssize_t post_offset = 0;
+
 
     if (strchr (url->stream_auth, '@') == NULL)
     {
@@ -563,7 +565,7 @@ static void url_stream_auth (auth_client *auth_user)
         pass = strdup("");
     }
 
-    snprintf (post, sizeof (post),
+    post_offset = snprintf (post, sizeof (post),
             "action=stream_auth&mount=%s&ip=%s&server=%s&port=%d&user=%s&pass=%s%s",
             mount, ipaddr, host, port, user, pass, admin);
     free (ipaddr);
@@ -571,6 +573,8 @@ static void url_stream_auth (auth_client *auth_user)
     free (pass);
     free (mount);
     free (host);
+
+    url_add_pass_headers(auth_user, post, post_offset);
 
     client->authenticated = 0;
     if (curl_easy_perform (url->handle))
