@@ -125,6 +125,8 @@ static void find_client_start (source_t *source, client_t *client)
     {
         size_t size = client->intro_offset;
         refbuf = source->burst_point;
+
+        ICECAST_LOG_INFO("Client start: %s size: %d", source->mount, size);
         while (size > 0 && refbuf && refbuf->next)
         {
             size -= refbuf->len;
@@ -258,6 +260,8 @@ int format_generic_write_to_client (client_t *client)
 
     if (ret > 0)
         client->pos += ret;
+
+    ICECAST_LOG_INFO("Client pos: %p %d", client, client->pos);
 
     return ret;
 }

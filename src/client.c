@@ -255,6 +255,8 @@ int client_send_bytes (client_t *client, const void *buf, unsigned len)
 {
     int ret = client->con->send (client->con, buf, len);
 
+    ICECAST_LOG_INFO("Client send bytes: %p %u", client, len);
+
     if (client->con->error)
         ICECAST_LOG_DEBUG("Client connection died");
 

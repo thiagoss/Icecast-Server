@@ -471,6 +471,8 @@ static refbuf_t *get_next_buffer (source_t *source)
 
     if (source->short_delay)
         delay = 0;
+
+    ICECAST_LOG_INFO("Delays: %s %d %d", source->mount, source->short_delay, delay);
     while (global.running == ICECAST_RUNNING && source->running)
     {
         int fds = 0;
@@ -506,7 +508,7 @@ static refbuf_t *get_next_buffer (source_t *source)
             thread_mutex_lock(&source->lock);
             if ((source->last_read + (time_t)source->timeout) < current)
             {
-                ICECAST_LOG_DEBUG("last %ld, timeout %d, now %ld", (long)source->last_read,
+                ICECAST_LOG_INFO("last %ld, timeout %d, now %ld", (long)source->last_read,
                         source->timeout, (long)current);
                 ICECAST_LOG_WARN("Disconnecting source due to socket timeout");
                 source->running = 0;
@@ -515,6 +517,8 @@ static refbuf_t *get_next_buffer (source_t *source)
             break;
         }
         source->last_read = current;
+        ICECAST_LOG_INFO("last %ld, timeout %d, now %ld", (long)source->last_read,
+                         source->timeout, (long)current);
         refbuf = source->format->get_buffer (source);
         if (source->client->con && source->client->con->error)
         {
@@ -573,6 +577,7 @@ static void send_to_listener (source_t *source, client_t *client, int deletion_e
         if (bytes <= 0)
             break;  /* can't write any more */
 
+        ICECAST_LOG_INFO("Source %s sent %d bytes to client: %p", source->mount, bytes, client);
         total_written += bytes;
     }
     source->format->sent_bytes += total_written;
@@ -719,6 +724,8 @@ void source_main (source_t *source)
         remove_from_q = 0;
         source->short_delay = 0;
 
+        ICECAST_LOG_INFO("Source %s main iteration: %p", source->mount, refbuf);
+
         if (refbuf)
         {
             /* append buffer to the in-flight data queue,  */
@@ -736,6 +743,7 @@ void source_main (source_t *source)
 
             /* new data on queue, so check the burst point */
             source->burst_offset += refbuf->len;
+            ICECAST_LOG_INFO("Source %s burst sizes: %u %u", source->mount, source->burst_offset, source->burst_size);
             while (source->burst_offset > source->burst_size)
             {
                 refbuf_t *to_release = source->burst_point;
@@ -756,6 +764,7 @@ void source_main (source_t *source)
         }
         /* lets see if we have too much data in the queue, but don't remove it until later */
         thread_mutex_lock(&source->lock);
+        ICECAST_LOG_INFO("Source %s queue sizes: %u %u", source->mount, source->queue_size, source->queue_size_limit);
         if (source->queue_size > source->queue_size_limit)
             remove_from_q = 1;
         thread_mutex_unlock(&source->lock);
@@ -770,6 +779,7 @@ void source_main (source_t *source)
         while (client_node) {
             client = (client_t *)client_node->key;
 
+            ICECAST_LOG_INFO("Source %s sending to client: %p", source->mount, client);
             send_to_listener (source, client, remove_from_q);
 
             if (client->con->error) {
@@ -779,6 +789,7 @@ void source_main (source_t *source)
                 avl_delete(source->client_tree, (void *)client, _free_client);
                 source->listeners--;
                 ICECAST_LOG_DEBUG("Client removed");
+                ICECAST_LOG_INFO("Source %s removed client", source->mount);
                 continue;
             }
             client_node = avl_get_next(client_node);
@@ -809,7 +820,7 @@ void source_main (source_t *source)
             avl_insert(source->client_tree, client_node->key);
 
             source->listeners++;
-            ICECAST_LOG_DEBUG("Client added for mountpoint (%s)", source->mount);
+            ICECAST_LOG_INFO("Client added for mountpoint (%s)", source->mount);
             stats_event_inc(source->mount, "connections");
 
             client_node = avl_get_next(client_node);
